@@ -1,0 +1,35 @@
+#-*- coding:utf-8 -*-
+from urllib.request import urlopen
+import requests
+from bs4 import BeautifulSoup as bs
+import re
+import os
+
+url = 'http://www.kosha.or.kr/kosha/data/guidanceC.do'
+
+payload = {'mode': 'list', 'articleLimit':'200'}
+r = requests.get(url, params=payload)
+html = r.text
+soup = bs(html, 'html.parser')
+soup = soup.find('table', {'class': 'Board-list-type07'})
+
+for link in soup.find_all('td',{'headers':'board_file'}):
+    downlink = link.find('a')['href']
+    if downlink == None:
+        break
+    downlink = url + downlink
+    downname = link.find('img')['alt']
+
+    downfolder = 'D:\97_Python\Requests'
+    downname = downfolder + "/" + downname
+    print(downname)
+    
+    #requests.get(downlink)
+    #with open(downname, 'wb') as f:
+    #    f.write(r_down)
+    
+    with urlopen(downlink) as res:
+        res_data = res.read()
+
+    with open(downname, 'wb') as f:
+        f.write(res_data)
