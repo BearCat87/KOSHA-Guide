@@ -1,35 +1,55 @@
-#-*- coding:utf-8 -*-
+# -*- coding:utf-8 -*-
 from urllib.request import urlopen
 import requests
 from bs4 import BeautifulSoup as bs
-import re
 import os
+import re
 
-url = 'http://www.kosha.or.kr/kosha/data/guidanceC.do'
 
-payload = {'mode': 'list', 'articleLimit':'200'}
-r = requests.get(url, params=payload)
-html = r.text
-soup = bs(html, 'html.parser')
-soup = soup.find('table', {'class': 'Board-list-type07'})
+def downKOSHA(url, folder):
+    payload = {'mode': 'list', 'articleLimit': '200'}
+    r = requests.get(url, params=payload)
+    html = r.text
+    soup = bs(html, 'html.parser')
+    soup = soup.find('table', {'class': 'Board-list-type07'})
 
-for link in soup.find_all('td',{'headers':'board_file'}):
-    downlink = link.find('a')['href']
-    if downlink == None:
-        break
-    downlink = url + downlink
-    downname = link.find('img')['alt']
+    for link in soup.find_all('tr', {'height': '23'}):
+        title = link.find('td', {'headers': 'board_title'})['title'].strip()  # 가이드 이름 찾기
+        guideno = link.find('td', {'headers': 'guidelineNo'}).text.strip()  # 가이드 번호 찾기
+        downextension = link.find('img')['alt']  # 확장자 찾기
+        fname, ext = os.path.splitext(downextension)  # 확장자 분리
+        filename = guideno + ' ' + title + ext
 
-    downfolder = 'D:\97_Python\Requests'
-    downname = downfolder + "/" + downname
-    print(downname)
-    
-    #requests.get(downlink)
-    #with open(downname, 'wb') as f:
-    #    f.write(r_down)
-    
-    with urlopen(downlink) as res:
-        res_data = res.read()
+        downFolder = folder  # 폴더 상대 위치 지정
 
-    with open(downname, 'wb') as f:
-        f.write(res_data)
+        if not os.path.exists(downFolder):  # 폴더가 없으면
+            os.makedirs(downFolder)  # 폴더 생성
+
+        totalFile = downFolder + filename  # 파일 저장위치 확정
+
+        downlink = link.find('a')['href']  # 다운로드할 파일 링크
+        if downlink == None:  # 링크가 없으면 패스
+            break
+        downlink = url + downlink  # 다운로드 링크 완성
+
+        with urlopen(downlink) as res:  # 다운로드 url 연결
+            res_data = res.read()
+
+        with open(totalFile, 'wb') as f:  # 다운로드 파일 연결
+            f.write(res_data)  # 데이터 자장
+
+
+folderlist = {"01_시료 채취 및 분석지침(A)", "02_조선항만하역지침(B)", "03_건설안전지침(C)", "04_안전설계지침(D)", "05_전기계장일반지침(E)", "06_화재보호지침(F)",
+              "07_안전보건일반지침(G)", "08_건강진단및관리지침(H)", "09_화학공업지침(K)", "10_기계일반지침(M)", "11_점검정비유지관리지침(O)", "12_공정안전지침(P)",
+              "13_산업독성지침(T)", "14_작업환경 관리지침(W)", "15_리스크관리지침(X)"}
+
+for list in folderlist:
+    pattern = re.compile(r'[a-z:A-Z]')     # 패턴
+    match = re.search(pattern, list)      # 매치 결과를 match 변수에 대입
+    No = match.group()                    # 매치한 텍스트 구하기
+
+    url = 'http://www.kosha.or.kr/kosha/data/guidance{No}.do'.format(No = No)
+    folder = 'D:/KOSHA Guide/{list}/'.format(list = list)
+    downKOSHA(url, folder)
+
+print('END!')
