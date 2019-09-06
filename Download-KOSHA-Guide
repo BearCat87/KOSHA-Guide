@@ -5,8 +5,46 @@ from bs4 import BeautifulSoup as bs
 import os
 import re
 import time
+import tkinter as tk
+from tkinter import messagebox
+
+def msgbox(title, info):
+    messagebox.showinfo(title, info)
+
+def datalist(firstfolder):
+    root.quit()
+    root.wm_state('iconic')
+    msgbox('Download Start!','Download Folder : ' + firstfolder)
+    folderlist = {"01_시료 채취 및 분석지침(A)",
+                  "02_조선항만하역지침(B)",
+                  "03_건설안전지침(C)",
+                  "04_안전설계지침(D)",
+                  "05_전기계장일반지침(E)",
+                  "06_화재보호지침(F)",
+                  "07_안전보건일반지침(G)",
+                  "08_건강진단및관리지침(H)",
+                  "09_화학공업지침(K)",
+                  "10_기계일반지침(M)",
+                  "11_점검정비유지관리지침(O)",
+                  "12_공정안전지침(P)",
+                  "13_산업독성지침(T)",
+                  "14_작업환경 관리지침(W)",
+                  "15_리스크관리지침(X)"
+                  }
+    folderlist = sorted(folderlist)             #폴더리스트 순서 정렬하기
+    for list in folderlist:
+        pattern = re.compile(r'[a-z:A-Z]')     # 패턴
+        match = re.search(pattern, list)      # 매치 결과를 match 변수에 대입
+        No = match.group()                    # 매치한 텍스트 구하기
+        url = 'http://www.kosha.or.kr/kosha/data/guidance{No}.do'.format(No = No)
+        subfolder = '{list}/'.format(list = list)            
+        folder = firstfolder + subfolder        
+        downKOSHA(url, folder)
 
 def downKOSHA(url, folder):
+    url = url
+    folder = folder
+    
     payload = {'mode': 'list', 'articleLimit': '200'}
     r = requests.get(url, params=payload)
     html = r.text
@@ -16,57 +54,66 @@ def downKOSHA(url, folder):
     for link in soup.find_all('tr', {'height': '23'}):
         title = link.find('td', {'headers': 'board_title'})['title'].strip()  # 가이드 이름 찾기
         guideno = link.find('td', {'headers': 'guidelineNo'}).text.strip()  # 가이드 번호 찾기
-        downextension = link.find('img')['alt']  # 확장자 찾기
-        fname, ext = os.path.splitext(downextension)  # 확장자 분리
-        filename = guideno + ' ' + title + ext
-        filename = re.sub("[\/:*?\"<>|]","",filename)       #사용 불가 텍스트 제거
+        
+        #if type(link.find('img')['alt']) == str:                         # 확장자 찾기
+        try:
+            downextension = link.find('img')
+            downextension = downextension['alt']         # 확장자 찾기        
+            fname, ext = os.path.splitext(downextension)    # 확장자 분리
+            filename = guideno + ' ' + title + ext
+            filename = re.sub("[\/:*?\"<>|]","",filename)   #사용 불가 텍스트 제거
 
-        downFolder = folder  # 폴더 상대 위치 지정
+            if not os.path.exists(folder):        # 폴더가 없으면
+                os.makedirs(folder)               # 폴더 생성
 
-        if not os.path.exists(downFolder):  # 폴더가 없으면
-            os.makedirs(downFolder)  # 폴더 생성
+            totalFile = folder + filename  # 파일 저장위치 확정
+            downlink = link.find('td',{'headers':'board_file'}) #다운로드 파일 링크 분리        
 
-        totalFile = downFolder + filename  # 파일 저장위치 확정
+            downlink = downlink.find('a')['href']  # 다운로드할 파일 링크
+            downlink = url + downlink  # 다운로드 링크 완성
+            with urlopen(downlink) as res:  # 다운로드 url 연결
+                res_data = res.read()
 
-        downlink = link.find('td',{'headers':'board_file'}) #다운로드 파일 링크 분리
-        downlink = downlink.find('a')['href']  # 다운로드할 파일 링크
-        if downlink == None:  # 링크가 없으면 패스
-            break
-        downlink = url + downlink  # 다운로드 링크 완성
+            with open(totalFile, 'wb') as f:  # 다운로드 파일 연결
+                f.write(res_data)  # 데이터 자장
+            
+            time.sleep(1)
 
-        with urlopen(downlink) as res:  # 다운로드 url 연결
-            res_data = res.read()
+        except TypeError:
+            pass
 
-        with open(totalFile, 'wb') as f:  # 다운로드 파일 연결
-            f.write(res_data)  # 데이터 자장
+class Application(tk.Frame):
+    def __init__(self, master=None):
+        super().__init__(master)
+        self.master = master
+        self.pack()
+        self.create_widgets()
+        root.title("KOSHA Download")            #GUI 타이틀 이름 지정
+        root.geometry("400x50+100+100")        #GUI 크기 지정, 없으면 자동 설정
+        root.resizable(False, False)            #GUI 크기 변경 가능여부 True or False
 
-        print(totalFile)
-        time.sleep(3)
+    def create_widgets(self):
+        self.description = tk.Label(self, text="KOSHA Download Folder : ")
+        self.description.grid(row=0, column=0)
+        
+        self.folderdata = tk.Entry(self)
+        self.folderdata.insert(0,"D:/KOSHA Guide/")
+        self.folderdata["width"] = 30
+        self.folderdata.grid(row=0, column=1)
+        
+        self.actionBtn = tk.Button(self, text = "Close", command = self.master.destroy)
+        self.actionBtn["width"] = 20
+        self.actionBtn.grid(row=1, column=0)
+        
+        self.actionBtn = tk.Button(self, text = "Download Start!!!!!!!", command = self.onclick)
+        self.actionBtn["fg"] = "red"
+        self.actionBtn["width"] = 30
+        self.actionBtn.grid(row=1, column=1)
+        
+    def onclick(self):
+        foldername = self.folderdata.get()
+        datalist(foldername)
 
-folderlist = {"01_시료 채취 및 분석지침(A)",
-              "02_조선항만하역지침(B)",
-              "03_건설안전지침(C)",
-              "04_안전설계지침(D)",
-              "05_전기계장일반지침(E)",
-              "06_화재보호지침(F)",
-              "07_안전보건일반지침(G)",
-              "08_건강진단및관리지침(H)",
-              "09_화학공업지침(K)",
-              "10_기계일반지침(M)",
-              "11_점검정비유지관리지침(O)",
-              "12_공정안전지침(P)",
-              "13_산업독성지침(T)",
-              "14_작업환경 관리지침(W)",
-              "15_리스크관리지침(X)"
-              }
-
-for list in folderlist:
-    pattern = re.compile(r'[a-z:A-Z]')     # 패턴
-    match = re.search(pattern, list)      # 매치 결과를 match 변수에 대입
-    No = match.group()                    # 매치한 텍스트 구하기
-
-    url = 'http://www.kosha.or.kr/kosha/data/guidance{No}.do'.format(No = No)
-    folder = 'D:/KOSHA Guide/{list}/'.format(list = list)
-    print(folder)
-    downKOSHA(url, folder)
-print('END!')
+root = tk.Tk()
+app = Application(master=root)
+app.mainloop()
